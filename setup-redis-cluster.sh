@@ -17,6 +17,10 @@ appendfilename appendonly-${port}.aof
 dbfilename dump-${port}.rdb
 requirepass ${REDIS_PASSWORD}
 masterauth ${REDIS_PASSWORD}
+loadmodule /opt/redis-stack/lib/redisearch.so
+loadmodule /opt/redis-stack/lib/redistimeseries.so
+loadmodule /opt/redis-stack/lib/rejson.so
+loadmodule /opt/redis-stack/lib/redisbloom.so
 EOF
   echo "Created configuration file for port ${port}"
 done
