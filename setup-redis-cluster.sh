@@ -11,6 +11,7 @@ for port in 7000 7001 7002 7003 7004 7005; do
   cat <<EOF > /usr/local/etc/redis/redis-${port}.conf
 bind 0.0.0.0
 protected-mode no
+cluster-announce-ip redis
 cluster-enabled yes
 cluster-config-file nodes-${port}.conf
 cluster-node-timeout 5000
