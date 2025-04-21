@@ -6,58 +6,37 @@ REDIS_PASSWORD=${REDIS_PASSWORD:-redispass}
 # Create the directory for redis configuration files
 mkdir -p /usr/local/etc/redis
 
-# Add Redis hostnames to the end of the 127.0.0.1 line in /etc/hosts
+# Add Redis hostnames and loopback IPs if REDIS_SERVICE_HOSTNAME is set
 if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
-  echo "Updating /etc/hosts with Redis hostnames"
-  
-  # Build list of needed hostnames
-  redis_hosts=()
+  echo "Configuring loopback IP aliases and /etc/hosts"
+
   for i in 0 1 2 3 4 5; do
-    if [ "$i" -eq 0 ]; then
-      redis_hosts+=("${REDIS_SERVICE_HOSTNAME}")
-    else
-      redis_hosts+=("${REDIS_SERVICE_HOSTNAME}${i}")
+    ip="127.0.0.$((1 + i))"
+    hostname="${REDIS_SERVICE_HOSTNAME}${i}"
+
+    # Add loopback alias (ignore error if already exists)
+    ip addr add ${ip}/8 dev lo 2>/dev/null || true
+
+    # Add to /etc/hosts if missing
+    if ! grep -q "$hostname" /etc/hosts; then
+      echo "$ip $hostname" >> /etc/hosts
+      echo "Mapped $ip to $hostname"
     fi
   done
-
-  # Read and modify /etc/hosts
-  if grep -q "^127.0.0.1" /etc/hosts; then
-    # Extract current line
-    current_line=$(grep "^127.0.0.1" /etc/hosts)
-    updated_line="$current_line"
-
-    for h in "${redis_hosts[@]}"; do
-      if ! grep -qE "(^127\.0\.0\.1\s|^127\.0\.0\.1\s.*\s)${h}(\s|$)" /etc/hosts; then
-        updated_line="$updated_line $h"
-      fi
-    done
-
-    # Replace the line if it changed
-    if [ "$updated_line" != "$current_line" ]; then
-      sed -i.bak "/^127.0.0.1/c\\$updated_line" /etc/hosts
-      echo "Updated /etc/hosts: $updated_line"
-    else
-      echo "All hostnames already present in /etc/hosts"
-    fi
-  else
-    echo "127.0.0.1 ${redis_hosts[*]}" >> /etc/hosts
-    echo "Added new 127.0.0.1 line to /etc/hosts"
-  fi
 fi
 
-# Create separate redis.conf files for each instance
-# if the REDIS_SERVICE_HOSTNAME is set, use it for cluster-announce-ip
+# Create redis.conf files
 index=0
 for port in 7000 7001 7002 7003 7004 7005; do
   {
-    echo "bind 0.0.0.0"
+    if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
+      echo "bind 127.0.0.$((1 + index))"
+    else
+      echo "bind 0.0.0.0"
+    fi
     echo "protected-mode no"
     if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
-      if [ "$index" -eq 0 ]; then
-        echo "cluster-announce-ip ${REDIS_SERVICE_HOSTNAME}"
-      else
-        echo "cluster-announce-ip ${REDIS_SERVICE_HOSTNAME}${index}"
-      fi
+      echo "cluster-announce-ip ${REDIS_SERVICE_HOSTNAME}${index}"
     fi
     echo "cluster-enabled yes"
     echo "cluster-config-file nodes-${port}.conf"
@@ -81,24 +60,44 @@ done
 ls -l /usr/local/etc/redis/
 
 # Start Redis instances
+index=0
 for port in 7000 7001 7002 7003 7004 7005; do
-  redis-server /usr/local/etc/redis/redis-${port}.conf --port ${port} --requirepass ${REDIS_PASSWORD} &
-  echo "Started Redis instance on port ${port}"
+  if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
+    bind_ip="127.0.0.$((1 + index))"
+  else
+    bind_ip="127.0.0.1"
+  fi
+
+  redis-server /usr/local/etc/redis/redis-${port}.conf --port ${port} --bind ${bind_ip} --requirepass ${REDIS_PASSWORD} &
+  echo "Started Redis instance on $bind_ip:$port"
+  index=$((index + 1))
 done
 
 # Wait for Redis instances to start
 sleep 5
 
 # Create the Redis cluster
-echo "yes" | redis-cli --cluster create \
-  127.0.0.1:7000 \
-  127.0.0.1:7001 \
-  127.0.0.1:7002 \
-  127.0.0.1:7003 \
-  127.0.0.1:7004 \
-  127.0.0.1:7005 \
-  --cluster-replicas 0 \
-  -a ${REDIS_PASSWORD}
+if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
+  echo "yes" | redis-cli --cluster create \
+    ${REDIS_SERVICE_HOSTNAME}0:7000 \
+    ${REDIS_SERVICE_HOSTNAME}1:7001 \
+    ${REDIS_SERVICE_HOSTNAME}2:7002 \
+    ${REDIS_SERVICE_HOSTNAME}3:7003 \
+    ${REDIS_SERVICE_HOSTNAME}4:7004 \
+    ${REDIS_SERVICE_HOSTNAME}5:7005 \
+    --cluster-replicas 0 \
+    -a ${REDIS_PASSWORD}
+else
+  echo "yes" | redis-cli --cluster create \
+    127.0.0.1:7000 \
+    127.0.0.1:7001 \
+    127.0.0.1:7002 \
+    127.0.0.1:7003 \
+    127.0.0.1:7004 \
+    127.0.0.1:7005 \
+    --cluster-replicas 0 \
+    -a ${REDIS_PASSWORD}
+fi
 
 # Keep the script running to prevent the container from exiting
 wait
