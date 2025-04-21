@@ -3,28 +3,35 @@
 # Set the Redis password, default to 'redispass' if not supplied
 REDIS_PASSWORD=${REDIS_PASSWORD:-redispass}
 
+
+
+
 # Create the directory for redis configuration files
 mkdir -p /usr/local/etc/redis
 
 # Create separate redis.conf files for each instance
+# if the REDIS_SERVICE_HOSTNAME is set, use it for cluster-announce-ip
 for port in 7000 7001 7002 7003 7004 7005; do
-  cat <<EOF > /usr/local/etc/redis/redis-${port}.conf
-bind 0.0.0.0
-protected-mode no
-cluster-announce-ip redis
-cluster-enabled yes
-cluster-config-file nodes-${port}.conf
-cluster-node-timeout 5000
-appendonly yes
-appendfilename appendonly-${port}.aof
-dbfilename dump-${port}.rdb
-requirepass ${REDIS_PASSWORD}
-masterauth ${REDIS_PASSWORD}
-loadmodule /opt/redis-stack/lib/redisearch.so
-loadmodule /opt/redis-stack/lib/redistimeseries.so
-loadmodule /opt/redis-stack/lib/rejson.so
-loadmodule /opt/redis-stack/lib/redisbloom.so
-EOF
+  {
+    echo "bind 0.0.0.0"
+    echo "protected-mode no"
+    if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
+      echo "cluster-announce-ip ${REDIS_SERVICE_HOSTNAME}"
+    fi
+    echo "cluster-enabled yes"
+    echo "cluster-config-file nodes-${port}.conf"
+    echo "cluster-node-timeout 5000"
+    echo "appendonly yes"
+    echo "appendfilename appendonly-${port}.aof"
+    echo "dbfilename dump-${port}.rdb"
+    echo "requirepass ${REDIS_PASSWORD}"
+    echo "masterauth ${REDIS_PASSWORD}"
+    echo "loadmodule /opt/redis-stack/lib/redisearch.so"
+    echo "loadmodule /opt/redis-stack/lib/redistimeseries.so"
+    echo "loadmodule /opt/redis-stack/lib/rejson.so"
+    echo "loadmodule /opt/redis-stack/lib/redisbloom.so"
+  } > /usr/local/etc/redis/redis-${port}.conf
+
   echo "Created configuration file for port ${port}"
 done
 
