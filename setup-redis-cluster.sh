@@ -11,12 +11,17 @@ mkdir -p /usr/local/etc/redis
 
 # Create separate redis.conf files for each instance
 # if the REDIS_SERVICE_HOSTNAME is set, use it for cluster-announce-ip
+index=0
 for port in 7000 7001 7002 7003 7004 7005; do
   {
     echo "bind 0.0.0.0"
     echo "protected-mode no"
     if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
-      echo "cluster-announce-ip ${REDIS_SERVICE_HOSTNAME}"
+      if [ "$index" -eq 0 ]; then
+        echo "cluster-announce-ip ${REDIS_SERVICE_HOSTNAME}"
+      else
+        echo "cluster-announce-ip ${REDIS_SERVICE_HOSTNAME}${index}"
+      fi
     fi
     echo "cluster-enabled yes"
     echo "cluster-config-file nodes-${port}.conf"
@@ -33,6 +38,7 @@ for port in 7000 7001 7002 7003 7004 7005; do
   } > /usr/local/etc/redis/redis-${port}.conf
 
   echo "Created configuration file for port ${port}"
+  index=$((index + 1))
 done
 
 # Verify the creation of configuration files
