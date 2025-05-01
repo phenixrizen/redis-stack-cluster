@@ -10,7 +10,7 @@ mkdir -p /usr/local/etc/redis
 if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
   echo "Configuring loopback IP aliases and /etc/hosts"
 
-  for i in 0 1 2 3 4 5; do
+  for i in 0 1 2 3 4; do
     ip="127.0.0.$((1 + i))"
     hostname="${REDIS_SERVICE_HOSTNAME}${i}"
 
@@ -27,7 +27,7 @@ fi
 
 # Create redis.conf files
 index=0
-for port in 7000 7001 7002 7003 7004 7005; do
+for port in 7000 7001 7002 7003 7004; do
   {
     if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
       echo "bind 127.0.0.$((1 + index))"
@@ -61,7 +61,7 @@ ls -l /usr/local/etc/redis/
 
 # Start Redis instances
 index=0
-for port in 7000 7001 7002 7003 7004 7005; do
+for port in 7000 7001 7002 7003 7004; do
   if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
     bind_ip="127.0.0.$((1 + index))"
   else
@@ -84,7 +84,6 @@ if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
     ${REDIS_SERVICE_HOSTNAME}2:7002 \
     ${REDIS_SERVICE_HOSTNAME}3:7003 \
     ${REDIS_SERVICE_HOSTNAME}4:7004 \
-    ${REDIS_SERVICE_HOSTNAME}5:7005 \
     --cluster-replicas 0 \
     -a ${REDIS_PASSWORD}
 else
@@ -94,7 +93,6 @@ else
     127.0.0.1:7002 \
     127.0.0.1:7003 \
     127.0.0.1:7004 \
-    127.0.0.1:7005 \
     --cluster-replicas 0 \
     -a ${REDIS_PASSWORD}
 fi
