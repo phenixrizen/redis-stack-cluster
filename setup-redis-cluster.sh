@@ -65,7 +65,7 @@ for port in 7000 7001 7002 7003 7004 7005; do
   if [ -n "${REDIS_SERVICE_HOSTNAME}" ]; then
     bind_ip="127.0.0.$((1 + index))"
   else
-    bind_ip="127.0.0.1"
+    bind_ip="0.0.0.0"
   fi
 
   redis-server /usr/local/etc/redis/redis-${port}.conf --port ${port} --bind ${bind_ip} --requirepass ${REDIS_PASSWORD} &
